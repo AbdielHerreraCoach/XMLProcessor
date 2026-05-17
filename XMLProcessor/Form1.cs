@@ -29,9 +29,54 @@ namespace XMLProcessor
         private XDocument documentoXML = null;
         private string rutaArchivoActual = string.Empty;
 
+        // 1. CONSTRUCTOR ORIGINAL: Mantiene la compatibilidad cuando se ejecuta solo
         public Form1()
         {
             InicializarComponentes();
+        }
+
+        // 2. NUEVO CONSTRUCTOR SOBRECARGADO: Invocado por tu explorador de archivos principal
+        public Form1(string ruta)
+        {
+            InicializarComponentes();
+
+            // Usamos el evento Load para garantizar que el componente TreeView ya exista
+            // en la interfaz antes de intentar poblar sus nodos con el XML
+            this.Load += (s, e) => CargarArchivoDirecto(ruta);
+        }
+
+        // 3. NUEVO MÉTODO: Realiza la carga directa del archivo en el árbol
+        public void CargarArchivoDirecto(string ruta)
+        {
+            try
+            {
+                documentoXML = XDocument.Load(ruta);
+                rutaArchivoActual = ruta;
+                lblArchivo.Text = $"Archivo: {rutaArchivoActual}";
+                CargarArbolDesdeDocumento();
+                HabilitarControles(true);
+                lblStatus.Text = $"XML cargado correctamente.";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error al cargar el archivo:\n{ex.Message}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        // 4. BOTÓN ORIGINAL DE CARGA: Modificado para delegar al método centralizado
+        private void BtnCargar_Click(object sender, EventArgs e)
+        {
+            using (OpenFileDialog ofd = new OpenFileDialog())
+            {
+                ofd.Filter = "Archivos XML (*.xml)|*.xml|Todos los archivos (*.*)|*.*";
+                ofd.Title = "Seleccionar archivo XML";
+
+                if (ofd.ShowDialog() == DialogResult.OK)
+                {
+                    CargarArchivoDirecto(ofd.FileName);
+                }
+            }
         }
 
         private void InicializarComponentes()
@@ -145,7 +190,6 @@ namespace XMLProcessor
             this.Controls.Add(lblStatus);
         }
 
-        // ─── NUEVO XML ────────────────────────────────────────────────────────────
         private void BtnNuevo_Click(object sender, EventArgs e)
         {
             using (NodoForm form = new NodoForm("Crear raíz del XML", "", "", new Dictionary<string, string>()))
@@ -168,35 +212,6 @@ namespace XMLProcessor
             }
         }
 
-        // ─── CARGAR XML ───────────────────────────────────────────────────────────
-        private void BtnCargar_Click(object sender, EventArgs e)
-        {
-            using (OpenFileDialog ofd = new OpenFileDialog())
-            {
-                ofd.Filter = "Archivos XML (*.xml)|*.xml|Todos los archivos (*.*)|*.*";
-                ofd.Title = "Seleccionar archivo XML";
-
-                if (ofd.ShowDialog() == DialogResult.OK)
-                {
-                    try
-                    {
-                        documentoXML = XDocument.Load(ofd.FileName);
-                        rutaArchivoActual = ofd.FileName;
-                        lblArchivo.Text = $"Archivo: {rutaArchivoActual}";
-                        CargarArbolDesdeDocumento();
-                        HabilitarControles(true);
-                        lblStatus.Text = $"XML cargado correctamente.";
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show($"Error al cargar el archivo:\n{ex.Message}", "Error",
-                            MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    }
-                }
-            }
-        }
-
-        // ─── GUARDAR XML ──────────────────────────────────────────────────────────
         private void BtnGuardar_Click(object sender, EventArgs e)
         {
             using (SaveFileDialog sfd = new SaveFileDialog())
@@ -236,7 +251,6 @@ namespace XMLProcessor
             }
         }
 
-        // ─── AGREGAR NODO HIJO ────────────────────────────────────────────────────
         private void BtnAgregarNodo_Click(object sender, EventArgs e)
         {
             if (treeXML.SelectedNode == null) return;
@@ -260,7 +274,6 @@ namespace XMLProcessor
             }
         }
 
-        // ─── EDITAR NODO ──────────────────────────────────────────────────────────
         private void BtnEditarNodo_Click(object sender, EventArgs e)
         {
             if (treeXML.SelectedNode == null) return;
@@ -271,26 +284,21 @@ namespace XMLProcessor
         {
             XElement nodo = (XElement)treeXML.SelectedNode.Tag;
 
-            // Leer atributos actuales
             Dictionary<string, string> attrActuales = nodo.Attributes()
                 .ToDictionary(a => a.Name.LocalName, a => a.Value);
 
-            // Solo pasar el valor si no tiene hijos elemento
             string valorActual = nodo.HasElements ? "" : nodo.Value;
 
             using (NodoForm form = new NodoForm("Editar nodo", nodo.Name.LocalName, valorActual, attrActuales))
             {
                 if (form.ShowDialog() == DialogResult.OK)
                 {
-                    // Renombrar si cambió el nombre
                     if (form.NombreNodo != nodo.Name.LocalName)
                         nodo.Name = form.NombreNodo;
 
-                    // Actualizar valor (solo si no tiene hijos elemento)
                     if (!nodo.HasElements)
                         nodo.Value = form.ValorNodo;
 
-                    // Actualizar atributos
                     foreach (var attr in nodo.Attributes().ToList())
                         attr.Remove();
                     foreach (var attr in form.Atributos)
@@ -302,7 +310,6 @@ namespace XMLProcessor
             }
         }
 
-        // ─── ELIMINAR NODO ────────────────────────────────────────────────────────
         private void BtnEliminarNodo_Click(object sender, EventArgs e)
         {
             if (treeXML.SelectedNode == null) return;
@@ -329,7 +336,6 @@ namespace XMLProcessor
             }
         }
 
-        // ─── CARGAR ÁRBOL DESDE DOCUMENTO ────────────────────────────────────────
         private void CargarArbolDesdeDocumento()
         {
             treeXML.BeginUpdate();
@@ -349,11 +355,9 @@ namespace XMLProcessor
         {
             string etiqueta = $"<{elemento.Name.LocalName}>";
 
-            // Mostrar atributos en la etiqueta
             foreach (XAttribute attr in elemento.Attributes())
                 etiqueta += $" {attr.Name.LocalName}=\"{attr.Value}\"";
 
-            // Mostrar valor si no tiene hijos elemento
             if (!elemento.HasElements && !string.IsNullOrWhiteSpace(elemento.Value))
                 etiqueta += $" = {elemento.Value}";
 
@@ -366,7 +370,6 @@ namespace XMLProcessor
             return nodo;
         }
 
-        // ─── SELECCIÓN EN ÁRBOL ───────────────────────────────────────────────────
         private void TreeXML_AfterSelect(object sender, TreeViewEventArgs e)
         {
             bool haySeleccion = e.Node != null;
@@ -386,14 +389,11 @@ namespace XMLProcessor
             EditarNodoSeleccionado();
         }
 
-        // ─── HABILITAR CONTROLES ──────────────────────────────────────────────────
         private void HabilitarControles(bool estado)
         {
             btnGuardar.Enabled = estado;
             btnExpandir.Enabled = estado;
             btnColapsar.Enabled = estado;
         }
-
-        // Note: application entry point is defined in Program.cs
     }
 }
